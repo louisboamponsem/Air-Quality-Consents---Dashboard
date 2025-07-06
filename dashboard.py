@@ -773,4 +773,4 @@ Answer:
         st.info("No chat history available yet.")
 
 st.markdown("---")
-st.caption("Built by Earl Tavera & Alana Jacobson-Pepere | Auckland Air Discharge Intelligence © 2025")
+st.caption("Credit: Earl Tavera & Alana Jacobson-Pepere | Auckland Air Discharge Intelligence © 2025")
