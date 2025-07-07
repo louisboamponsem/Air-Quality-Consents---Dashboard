@@ -528,12 +528,6 @@ def get_corpus_embeddings(text_blobs_tuple, model_name_str):
 
 
 df = pd.DataFrame()
-# ─── Override consent numbers with the file name ────────────────────────────────
-df["Resource Consent Numbers"] = df["__file_name__"]
-
-# ─── Drop internal/name columns we no longer need ───────────────────────────────
-df.drop(columns=["__file_name__", "Consent Condition Numbers"],
-        errors="ignore", inplace=True)
 
 # --- File Processing & Dashboard ---
 if uploaded_files:
@@ -563,6 +557,13 @@ if uploaded_files:
         # --- Stage 2: Geocoding (70% -> 90% of total progress) ---
         my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
         df = pd.DataFrame(all_data)
+        # ─── Override consent numbers with the file name ────────────────────────────────
+        df["Resource Consent Numbers"] = df["__file_name__"]
+
+        # ─── Drop internal/name columns we no longer need ───────────────────────────────
+        df.drop(columns=["__file_name__", "Consent Condition Numbers"],
+                errors="ignore", inplace=True)
+
         df["GeoKey"] = df["Address"].str.lower().str.strip()
         # Geocoding is the slow part of this stage
         df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
