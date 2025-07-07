@@ -25,6 +25,38 @@ from langchain_groq import ChatGroq  # For Groq (Langchain integration)
 from langchain_core.messages import SystemMessage, HumanMessage  # Needed for Langchain messages
 
 # --- End LLM Specific Imports ---
+# File Upload & Consent Number Extraction
+# ------------------------
+uploaded_files = st.sidebar.file_uploader(
+    "Upload PDF decision reports", type=["pdf"], accept_multiple_files=True
+)
+consents = []
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        # Extract consent number from file name
+        filename = uploaded_file.name  # e.g., "BUN60381545 Decision.pdf"
+        consent_number = os.path.splitext(filename)[0]  # "BUN60381545 Decision"
+        # Optionally refine: split off descriptive part
+        # consent_number = filename.split()[0]  # "BUN60381545"
+        consents.append(consent_number)
+
+        # Display on UI
+        st.sidebar.markdown(f"**Consent Number:** {consent_number}")
+
+        # Read PDF bytes for parsing below
+        pdf_bytes = uploaded_file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        # ... existing PDF parsing logic ...
+
+# Store or display all extracted consent numbers
+if consents:
+    st.markdown("### Uploaded Consents")
+    for c in consents:
+        st.write(f"- {c}")
+
+# ... rest of dashboard code unchanged ...
+
 
 # --- API Key Setup ---
 load_dotenv()
