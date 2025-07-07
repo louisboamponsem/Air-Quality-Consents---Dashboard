@@ -645,18 +645,32 @@ if uploaded_files:
 
         # Consent Table
         with st.expander("Consent Table", expanded=True):
-            status_filter = st.selectbox("Filter by Status", ["All"] + df["Consent Status Enhanced"].unique().tolist())
-            filtered_df = df if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
+            my_bar.progress(95, text="Step 4/4: Filtering and displaying consent table...")
+
+            if status_filter == "All":
+                filtered_df = df.copy()
+            else:
+                filtered_df = df[df["Consent Status Enhanced"] == status_filter]
+
+            columns_to_display = [
+                "Resource Consent Numbers",
+                "Company Name",
+                "Address",
+                "Issue Date",
+                "Expiry Date",
+                "Consent Status Enhanced",
+                "AUP(OP) Triggers",
+            ]
+            if "Reason for Consent" in filtered_df.columns:
+                columns_to_display.append("Reason for Consent")
 
             display_df = (
                 filtered_df[columns_to_display]
                 .rename(columns={"Consent Status Enhanced": "Consent Status"})
             )
 
-            display_df = filtered_df[columns_to_display].rename(
-                columns={"__file_name__": "File Name", "Consent Status Enhanced": "Consent Status"})
-
             st.dataframe(display_df)
+
             csv_output = display_df.to_csv(index=False).encode("utf-8")
             st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
 
