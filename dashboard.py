@@ -557,7 +557,19 @@ if uploaded_files:
         # --- Stage 2: Geocoding (70% -> 90% of total progress) ---
         my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
         df = pd.DataFrame(all_data)
+
+        # ─── Force the consent ID to be the PDF file name ────────────────────────────
+        df["Resource Consent Numbers"] = df["__file_name__"]
+
+        # ─── Drop now-redundant internal columns ────────────────────────────────────
+        df.drop(
+            columns=["__file_name__", "Consent Condition Numbers"],
+            errors="ignore",
+            inplace=True
+        )
+
         df["GeoKey"] = df["Address"].str.lower().str.strip()
+
         # Geocoding is the slow part of this stage
         df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
 
