@@ -564,6 +564,10 @@ if uploaded_files:
         df.drop(columns=["__file_name__", "Consent Condition Numbers"],
                 errors="ignore", inplace=True)
 
+        # ─── Override consent numbers with the file name ────────────────────────────────
+        df["Resource Consent Numbers"] = df["__file_name__"]
+
+
         df["GeoKey"] = df["Address"].str.lower().str.strip()
         # Geocoding is the slow part of this stage
         df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
