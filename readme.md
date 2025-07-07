@@ -113,7 +113,7 @@ Include UI screenshots or GIFs here to showcase the dashboard in action.
 
 ## 👏 Authors
 
-Built by Earl Tavera & Alana Jacobson-Pepere | Auckland Air Discharge Intelligence © 2025
+Built by Earl Tavera, Alana Jacobson-Pepere & Louis Boamponsem| Auckland Air Discharge Intelligence © 2025
 
 ---
 
