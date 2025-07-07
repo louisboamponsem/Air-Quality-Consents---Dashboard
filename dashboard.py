@@ -173,6 +173,50 @@ def geocode_address(address):
         st.warning(f"Geocoding failed for '{standardized_address}': {e}")
         return (None, None)
 
+
+def extract_metadata(text):
+    from datetime import datetime
+    import re
+
+    # --- Signature-based Issue Date ---
+    # Capture the date immediately under the "Signed:" block
+    sig_date_match = re.search(
+        r"Signed:[^\n]*\n[^\n]*\n\s*Date:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+        text,
+        re.IGNORECASE
+    )
+    if sig_date_match:
+        try:
+            issue_date = datetime.strptime(sig_date_match.group(1), "%d %B %Y")
+        except Exception:
+            issue_date = None
+    else:
+        issue_date = None
+
+    # --- Existing Issue Date Patterns (fallback) ---
+    if not issue_date:
+        issue_date_patterns = [
+            r"Date:\s*(\d{1,2} [A-Za-z]+ \d{4})",
+            r"Commissioner\s*(\d{1,2} [A-Za-z]+ \d{4})",
+            # ... other existing patterns ...
+        ]
+        for pattern in issue_date_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                try:
+                    issue_date = datetime.strptime(matches[0], "%d %B %Y")
+                    break
+                except ValueError:
+                    continue
+
+    # --- Continue with rest of metadata extraction ---
+    # ...
+
+    return {
+        # ... include 'Issue Date': issue_date.strftime(...) ...
+    }
+
+
 def extract_metadata(text):
     # RC number patterns
     rc_patterns = [
