@@ -178,38 +178,55 @@ def geocode_address(address):
         from datetime import datetime, timedelta
 
         # --- Signature-based Issue Date (Primary) ---
-        # Look for the planner's signature block followed by the date
+        # Capture the date immediately under the "Signed:" block
         sig_date_match = re.search(
-            r"Signed:[^\n]*\n[^
-        ] * \n\s * Date:\s * (\d{1, 2}\s+[A-Za-z]+\s+\d{4})
-        ",
-        text,
-        re.IGNORECASE
-
-    )
-    if sig_date_match:
-        try:
-            issue_date = datetime.strptime(sig_date_match.group(1), "%d %B %Y")
-        except Exception:
-            issue_date = None
+            r"Signed:[^\n]*\n[^\n]*\n\s*Date:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+            text,
+            re.IGNORECASE
+        )
+        if sig_date_match:
+            try:
+                issue_date = datetime.strptime(sig_date_match.group(1), "%d %B %Y")
+            except Exception:
+                issue_date = None
         else:
             issue_date = None
 
-    # --- Existing Issue Date Patterns (Fallback) ---
-    if not issue_date:
-        issue_date_patterns = [
-            r"Date:\s*(\d{1,2} [A-Za-z]+ \d{4})",
-            r"Commissioner\s*(\d{1,2} [A-Za-z]+ \d{4})",
-            # add any other common date labels here
+        # --- Existing Issue Date Patterns (Fallback) ---
+        if not issue_date:
+            issue_date_patterns = [
+                r"Date:\s*(\d{1,2} [A-Za-z]+ \d{4})",
+                r"Commissioner\s*(\d{1,2} [A-Za-z]+ \d{4})",
+                # ... other patterns ...
+            ]
+            for pattern in issue_date_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    try:
+                        issue_date = datetime.strptime(match.group(1), "%d %B %Y")
+                        break
+                    except ValueError:
+                        continue
+
+        # --- Resource Consent Number Patterns ---
+        rc_patterns = [
+            r"Application number[:s]*\s*(.+?)(?=\s*Applicant:)",
+            r"RC[0-9]{5,}",
+            # ... your other patterns ...
         ]
-        for pattern in issue_date_patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                try:
-                    issue_date = datetime.strptime(match.group(1), "%d %B %Y")
-                    break
-                except ValueError:
-                    continue
+        rc_matches = []
+        for pattern in rc_patterns:
+            rc_matches.extend(re.findall(pattern, text, flags=re.IGNORECASE | re.DOTALL))
+        # ... flatten and dedupe rc_matches into rc_str ...
+
+        # --- Continue with other metadata extraction (company, address, expiry, etc.) ---
+        # ... your existing code for expiry, geocoding, triggers, etc. ...
+
+        # --- Format outputs ---
+        return {
+            "Issue Date": issue_date.strftime("%d-%m-%Y") if issue_date else "Unknown Issue Date",
+            # include other fields here, e.g. "Resource Consent Numbers": rc_str, etc.
+        }
 
     # --- Resource Consent Number Patterns ---
     rc_patterns = [
