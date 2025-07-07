@@ -27,6 +27,8 @@ from langchain_core.messages import SystemMessage, HumanMessage  # Needed for La
 # --- End LLM Specific Imports ---
 # File Upload & Consent Number Extraction
 # ------------------------
+# File Upload & Consent Number Extraction
+# ------------------------
 uploaded_files = st.sidebar.file_uploader(
     "Upload PDF decision reports", type=["pdf"], accept_multiple_files=True
 )
@@ -54,7 +56,6 @@ if consents:
     st.markdown("### Uploaded Consents")
     for c in consents:
         st.write(f"- {c}")
-
 # ... rest of dashboard code unchanged ...
 
 
