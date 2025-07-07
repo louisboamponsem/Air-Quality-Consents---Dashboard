@@ -528,6 +528,12 @@ def get_corpus_embeddings(text_blobs_tuple, model_name_str):
 
 
 df = pd.DataFrame()
+# ─── Override consent numbers with the file name ────────────────────────────────
+df["Resource Consent Numbers"] = df["__file_name__"]
+
+# ─── Drop internal/name columns we no longer need ───────────────────────────────
+df.drop(columns=["__file_name__", "Consent Condition Numbers"],
+        errors="ignore", inplace=True)
 
 # --- File Processing & Dashboard ---
 if uploaded_files:
