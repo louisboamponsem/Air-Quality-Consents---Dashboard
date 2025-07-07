@@ -172,13 +172,11 @@ def geocode_address(address):
     except Exception as e:
         st.warning(f"Geocoding failed for '{standardized_address}': {e}")
         return (None, None)
+    import re
+    from datetime import datetime, timedelta
 
     def extract_metadata(text):
-        import re
-        from datetime import datetime, timedelta
-
         # --- Signature-based Issue Date (Primary) ---
-        # Capture the date immediately under the "Signed:" block (planner signature)
         sig_date_match = re.search(
             r"Signed:[^\n]*\n[^\n]*\n\s*Date:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
             text,
@@ -197,7 +195,6 @@ def geocode_address(address):
             issue_date_patterns = [
                 r"Date:\s*(\d{1,2} [A-Za-z]+ \d{4})",
                 r"Commissioner\s*(\d{1,2} [A-Za-z]+ \d{4})",
-                # add other common date labels if needed
             ]
             for pattern in issue_date_patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
@@ -208,21 +205,12 @@ def geocode_address(address):
                     except ValueError:
                         continue
 
-        # --- Placeholder for rest of metadata extraction ---
-        # You would continue here with:
-        # - Resource Consent Number extraction
-        # - Company Name extraction
-        # - Address extraction
-        # - Expiry Date extraction
-        # - AUP triggers, etc.
+        # --- Continue with remaining metadata extraction ---
+        # (Resource Consent Numbers, Company Name, Address, Expiry Date, etc.)
+        # Use your existing logic here.
 
-        # --- Build and return metadata dictionary ---
         return {
             "Issue Date": issue_date.strftime("%d-%m-%Y") if issue_date else "Unknown Issue Date",
-            # "Resource Consent Numbers": rc_str,
-            # "Company Name": company_str,
-            # "Address": address_str,
-            # "Expiry Date": expiry_str,
             # ... other fields ...
         }
 
