@@ -520,16 +520,15 @@ def get_corpus_embeddings(text_blobs_tuple, model_name_str):
 
 
 # --- File Processing & Dashboard ---
+# --- File Processing & Dashboard ---
 if uploaded_files:
-    # --- START: MULTI-STAGE PROGRESS BAR ---
+    # 1) Initialize progress bar & collect PDF text
     my_bar = st.progress(0, text="Initializing...")
     all_data = []
-    total_files = len(uploaded_files)
-
-    # Stage 1: PDF Processing (0% → 70%)
+    total = len(uploaded_files)
     for i, file in enumerate(uploaded_files):
-        pct = int(((i + 1) / total_files) * 70)
-        my_bar.progress(pct, text=f"Step 1/3: Processing {file.name} ({i+1}/{total_files})…")
+        pct = int(((i + 1) / total) * 70)
+        my_bar.progress(pct, text=f"Step 1/3: Processing {file.name} ({i+1}/{total})...")
         try:
             fb = file.read()
             with fitz.open(stream=fb, filetype="pdf") as doc:
@@ -539,12 +538,12 @@ if uploaded_files:
             rec["__file_bytes__"] = fb
             all_data.append(rec)
         except Exception as e:
-            st.error(f"Error reading {file.name}: {e}")
+            st.error(f"Error on {file.name}: {e}")
 
-    # Only continue if we got anything back
+    # 2) If we got anything, build the DataFrame & go
     if all_data:
-        # Stage 2: Geocoding (70% → 90%)
-        my_bar.progress(75, text="Step 2/3: Geocoding addresses…")
+        # 2a) Geocoding progress
+        my_bar.progress(75, text="Step 2/3: Geocoding addresses...")
         df = pd.DataFrame(all_data)
 
         # ─── Force the consent ID to be the PDF file name ────────────────────────────
@@ -557,22 +556,72 @@ if uploaded_files:
             inplace=True
         )
 
-        # ─── Now do your geocoding ─────────────────────────────────────────────────
+        # 2b) Geocode
         df["GeoKey"] = df["Address"].astype(str).str.lower().str.strip()
         df["Latitude"], df["Longitude"] = zip(
             *df["GeoKey"].apply(geocode_address)
         )
 
-        # Stage 3: Finalizing & Rendering (90% → 100%)
-        my_bar.progress(90, text="Step 3/3: Finalizing dashboard…")
-        # … (apply datetime localization, enhanced status, metrics, maps, tables, etc.) …
+        # 3) Finalizing (dates, status, metrics)
+        my_bar.progress(90, text="Step 3/3: Finalizing dashboard...")
+        # --- DATETIME LOCALIZATION ---
+        df["Issue Date"]  = pd.to_datetime(df["Issue Date"],  errors="coerce", dayfirst=True).apply(localize_to_auckland)
+        df["Expiry Date"] = pd.to_datetime(df["Expiry Date"], errors="coerce", dayfirst=True).apply(localize_to_auckland)
+        # --- ENHANCED STATUS ---
+        df["Consent Status Enhanced"] = df["Consent Status"]
+        now_nz = datetime.now(pytz.timezone("Pacific/Auckland"))
+        df.loc[
+            (df["Consent Status"]=="Active") &
+            (df["Expiry Date"]> now_nz) &
+            (df["Expiry Date"]<= now_nz + timedelta(days=90)),
+            "Consent Status Enhanced"
+        ] = "Expiring in 90 Days"
+
+        # --- Metrics & Visuals (as you already have them) ---
+        # st.subheader(...); colored_metric(...); status bar chart; etc.
+
+        # --- Consent Table ---
+        with st.expander("Consent Table", expanded=True):
+            status_filter = st.selectbox(
+                "Filter by Status",
+                ["All"] + df["Consent Status Enhanced"].unique().tolist(),
+                key="consent_status_filter"
+            )
+            my_bar.progress(95, text="Step 4/4: Displaying consent table...")
+            filtered = df if status_filter=="All" else df[df["Consent Status Enhanced"]==status_filter]
+            cols = [
+                "Resource Consent Numbers",
+                "Company Name", "Address",
+                "Issue Date", "Expiry Date",
+                "Consent Status Enhanced",
+                "AUP(OP) Triggers"
+            ]
+            if "Reason for Consent" in filtered.columns:
+                cols.append("Reason for Consent")
+            display_df = (
+                filtered[cols]
+                .rename(columns={"Consent Status Enhanced":"Consent Status"})
+            )
+            st.dataframe(display_df)
+            st.download_button(
+                "Download CSV",
+                display_df.to_csv(index=False).encode("utf-8"),
+                "filtered_consents.csv",
+                "text/csv"
+            )
+
+        # --- Consent Map, Semantic Search, etc. (your existing code) ---
+
+        # 4) Done!
         my_bar.progress(100, text="Dashboard Ready!")
+        time.sleep(1)
         my_bar.empty()
 
     else:
-        # No data extracted at all
+        # Handle no-data case
         my_bar.empty()
         st.warning("Could not extract any data from the uploaded files.")
+
 
         # --- START RENDERING DASHBOARD ---
 
