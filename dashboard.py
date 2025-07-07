@@ -631,15 +631,10 @@ if uploaded_files:
             status_filter = st.selectbox("Filter by Status", ["All"] + df["Consent Status Enhanced"].unique().tolist())
             filtered_df = df if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
 
-            columns_to_display = [
-                "__file_name__", "Resource Consent Numbers", "Company Name", "Address", "Issue Date", "Expiry Date",
-                "Consent Status Enhanced", "AUP(OP) Triggers"
-            ]
-            # Conditionally add "Reason for Consent" and "Consent Condition Numbers" if they exist
-            if "Reason for Consent" in filtered_df.columns:
-                columns_to_display.append("Reason for Consent")
-            if "Consent Condition Numbers" in filtered_df.columns:
-                columns_to_display.append("Consent Condition Numbers")
+            display_df = (
+                filtered_df[columns_to_display]
+                .rename(columns={"Consent Status Enhanced": "Consent Status"})
+            )
 
             display_df = filtered_df[columns_to_display].rename(
                 columns={"__file_name__": "File Name", "Consent Status Enhanced": "Consent Status"})
