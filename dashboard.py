@@ -34,7 +34,7 @@ openweathermap_api_key = os.getenv("OPENWEATHER_API_KEY") or st.secrets.get("OPE
 # ------------------------
 # Streamlit Page Config & Style (MUST BE THE FIRST STREAMLIT COMMAND)
 # ------------------------
-st.set_page_config(page_title="Auckland Air Discharge Consents Dashboard", layout="wide", page_icon="🇳🇿", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Auckland Air Discharge Consent Dashboard", layout="wide", page_icon="🇳🇿", initial_sidebar_state="expanded")
 
 if google_api_key:
     genai.configure(api_key=google_api_key)
@@ -78,7 +78,7 @@ st.markdown(f"""
 st.markdown("""
     <div style="text-align: center;">
         <h2 style='color:#004489; font-family: Quicksand, sans-serif; font-size: 2.7em;'>
-            Auckland Air Discharge Consents Dashboard  
+            Auckland Air Discharge Consent Dashboard  
         </h2>
         <p style='font-size: 1.1em; color: #dc002e;'>
             This dashboard allows you to upload Air Discharge Resource Consent Decision Reports to transform your files into meaningful data.
@@ -89,9 +89,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("---") # Horizontal line for separation
-with st.expander("About the Auckland Air Discharge Consents Dashboard", expanded=False): # Key change here: expanded=False
+with st.expander("About the Auckland Air Discharge Consent Dashboard", expanded=False): # Key change here: expanded=False
     st.write("""
-    Kia Ora! Welcome to the **Auckland Air Discharge Consents Dashboard**, a pioneering tool designed to revolutionize how we interact with critical environmental data. In Auckland, managing **Air Discharge Resource Consents** is vital for maintaining our air quality and ensuring regulatory compliance. Traditionally, this information has been locked away in numerous, disparate PDF reports, making it incredibly challenging to access, analyze, and monitor effectively.
+    Kia Ora! Welcome to the **Auckland Air Discharge Consent Dashboard**, a pioneering tool designed to revolutionize how we interact with critical environmental data. In Auckland, managing **Air Discharge Resource Consents** is vital for maintaining our air quality and ensuring regulatory compliance. Traditionally, this information has been locked away in numerous, disparate PDF reports, making it incredibly challenging to access, analyze, and monitor effectively.
 
     This dashboard addresses that very challenge head-on. We've developed a user-friendly, web-based application that automatically extracts, visualizes, and analyzes data from these PDF consent reports. Our key innovation lies in leveraging **Artificial Intelligence (AI)**, including **Large Language Models (LLMs)**, to transform static documents into dynamic, searchable insights. This means you can now effortlessly track consent statuses, identify expiring permits, and even query the data using natural language, asking questions like, "Which companies have expired consents?" or "What conditions apply to dust emissions?".
 
@@ -299,24 +299,26 @@ def extract_metadata(text):
                     continue
             if expiry_date:
                 break
-    
-    # If no expiry date is found, try to infer it from phrases like "shall expire 15 years from the date of issue"
-if not expiry_date:
-    # Match patterns like "shall expire 15 years from the date of issue"
-    match = re.search(r"(expire[s]?|shall expire)[^\\n]{0,40}?(\\d{1,2})\\s+years\\s+from\\s+the\\s+date\\s+of\\s+issue", text, re.IGNORECASE)
-    if match and issue_date:
-        try:
-            years = int(match.group(2))
-            expiry_date = issue_date + timedelta(days=years * 365.25)
-        except Exception:
-            expiry_date = None
 
-# Fallback: match generic "X years" if the above fails
-if not expiry_date:
-    years_match = re.search(r'(\\d{1,2})\\s+years', text, re.IGNORECASE)
-    if years_match and issue_date:
-        num_years = int(years_match.group(1))
-        expiry_date = issue_date + timedelta(days=num_years * 365.25)
+    # If no expiry date is found, try to infer it from phrases like "shall expire 15 years from the date of issue"
+    if not expiry_date:
+        # Match patterns like "shall expire 15 years from the date of issue"
+        match = re.search(
+            r"(expire[s]?|shall expire)[^\\n]{0,40}?(\\d{1,2})\\s+years\\s+from\\s+the\\s+date\\s+of\\s+issue", text,
+            re.IGNORECASE)
+        if match and issue_date:
+            try:
+                years = int(match.group(2))
+                expiry_date = issue_date + timedelta(days=years * 365.25)
+            except Exception:
+                expiry_date = None
+
+    # Fallback: match generic "X years" if the above fails
+    if not expiry_date:
+        years_match = re.search(r'(\\d{1,2})\\s+years', text, re.IGNORECASE)
+        if years_match and issue_date:
+            num_years = int(years_match.group(1))
+            expiry_date = issue_date + timedelta(days=num_years * 365.25)
 
     # AUP triggers
     trigger_patterns = [
@@ -782,4 +784,4 @@ Answer:
         st.info("No chat history available yet.")
 
 st.markdown("---")
-st.caption("Louis Boamponsem © 2025|Credit: Earl Tavera & Alana Jacobson-Pepere")
+st.caption("Built by Earl Tavera & Alana Jacobson-Pepere | Auckland Air Discharge Intelligence © 2025")
