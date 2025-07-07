@@ -300,14 +300,23 @@ def extract_metadata(text):
             if expiry_date:
                 break
     
-    # If no specific expiry date is found, try to infer it from "X years" phrases
-    if not expiry_date:
-        years_match = re.search(r'(\d+)\s+years', text, re.IGNORECASE)
-        if years_match and issue_date:
-            num_years = int(years_match.group(1))
-            expiry_date = issue_date + timedelta(days=num_years * 365.25) # Account for leap years
-    
-    expiry_str = expiry_date.strftime("%d-%m-%Y") if expiry_date else "Unknown Expiry Date"
+    # If no expiry date is found, try to infer it from phrases like "shall expire 15 years from the date of issue"
+if not expiry_date:
+    # Match patterns like "shall expire 15 years from the date of issue"
+    match = re.search(r"(expire[s]?|shall expire)[^\\n]{0,40}?(\\d{1,2})\\s+years\\s+from\\s+the\\s+date\\s+of\\s+issue", text, re.IGNORECASE)
+    if match and issue_date:
+        try:
+            years = int(match.group(2))
+            expiry_date = issue_date + timedelta(days=years * 365.25)
+        except Exception:
+            expiry_date = None
+
+# Fallback: match generic "X years" if the above fails
+if not expiry_date:
+    years_match = re.search(r'(\\d{1,2})\\s+years', text, re.IGNORECASE)
+    if years_match and issue_date:
+        num_years = int(years_match.group(1))
+        expiry_date = issue_date + timedelta(days=num_years * 365.25)
 
     # AUP triggers
     trigger_patterns = [
