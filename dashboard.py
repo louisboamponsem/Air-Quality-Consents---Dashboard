@@ -645,13 +645,22 @@ if uploaded_files:
 
         # Consent Table
         with st.expander("Consent Table", expanded=True):
+            # ─── 4a) Let the user pick which status to show ────────────────────────────────
+            status_filter = st.selectbox(
+                "Filter by Status",
+                ["All"] + df["Consent Status Enhanced"].unique().tolist()
+            )
+
+            # ─── 4b) Progress indicator ────────────────────────────────────────────────────
             my_bar.progress(95, text="Step 4/4: Filtering and displaying consent table...")
 
+            # ─── 4c) Filter the DataFrame ──────────────────────────────────────────────────
             if status_filter == "All":
                 filtered_df = df.copy()
             else:
                 filtered_df = df[df["Consent Status Enhanced"] == status_filter]
 
+            # ─── 4d) Define which columns to show ───────────────────────────────────────────
             columns_to_display = [
                 "Resource Consent Numbers",
                 "Company Name",
@@ -664,15 +673,22 @@ if uploaded_files:
             if "Reason for Consent" in filtered_df.columns:
                 columns_to_display.append("Reason for Consent")
 
+            # ─── 4e) Slice & rename for display ────────────────────────────────────────────
             display_df = (
                 filtered_df[columns_to_display]
                 .rename(columns={"Consent Status Enhanced": "Consent Status"})
             )
 
+            # ─── 4f) Render the table and download button ─────────────────────────────────
             st.dataframe(display_df)
 
             csv_output = display_df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
+            st.download_button(
+                "Download CSV",
+                csv_output,
+                "filtered_consents.csv",
+                "text/csv"
+            )
 
         # Consent Map
         with st.expander("Consent Map", expanded=True):
