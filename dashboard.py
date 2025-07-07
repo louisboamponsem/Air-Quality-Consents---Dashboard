@@ -173,85 +173,63 @@ def geocode_address(address):
         st.warning(f"Geocoding failed for '{standardized_address}': {e}")
         return (None, None)
 
+    def extract_metadata(text):
+        import re
+        from datetime import datetime, timedelta
 
-def extract_metadata(text):
-    from datetime import datetime
-    import re
-
-    # --- Signature-based Issue Date ---
-    # Capture the date immediately under the "Signed:" block
-    sig_date_match = re.search(
-        r"Signed:[^\n]*\n[^\n]*\n\s*Date:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+        # --- Signature-based Issue Date (Primary) ---
+        # Look for the planner's signature block followed by the date
+        sig_date_match = re.search(
+            r"Signed:[^\n]*\n[^
+        ] * \n\s * Date:\s * (\d{1, 2}\s+[A-Za-z]+\s+\d{4})
+        ",
         text,
         re.IGNORECASE
+
     )
     if sig_date_match:
         try:
             issue_date = datetime.strptime(sig_date_match.group(1), "%d %B %Y")
         except Exception:
             issue_date = None
-    else:
-        issue_date = None
+        else:
+            issue_date = None
 
-    # --- Existing Issue Date Patterns (fallback) ---
+    # --- Existing Issue Date Patterns (Fallback) ---
     if not issue_date:
         issue_date_patterns = [
             r"Date:\s*(\d{1,2} [A-Za-z]+ \d{4})",
             r"Commissioner\s*(\d{1,2} [A-Za-z]+ \d{4})",
-            # ... other existing patterns ...
+            # add any other common date labels here
         ]
         for pattern in issue_date_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
                 try:
-                    issue_date = datetime.strptime(matches[0], "%d %B %Y")
+                    issue_date = datetime.strptime(match.group(1), "%d %B %Y")
                     break
                 except ValueError:
                     continue
 
-    # --- Continue with rest of metadata extraction ---
-    # ...
-
-    return {
-        # ... include 'Issue Date': issue_date.strftime(...) ...
-    }
-
-
-def extract_metadata(text):
-    # RC number patterns
+    # --- Resource Consent Number Patterns ---
     rc_patterns = [
-        r"Application number:\s*(.+?)(?=\s*Applicant:)",
-        r"Application numbers:\s*(.+?)(?=\s*Applicant:)",
-        r"Application number(s):\s*(.+?)(?=\s*Applicant:)",
-        r"Application number:\s*(.+?)(?=\s*Original consent)",
-        r"Application numbers:\s*(.+?)(?=\s*Original consent)",
-        r"Application number:\s*(.+?)(?=\s*Site address:)",
-        r"Application numbers:\s*(.+?)(?=\s*Site address:)",
-        r"Application number(s):\s*(.+?)(?=\s*Site address:)",
-        r"RC[0-9]{5,}"
+        r"Application number[:s]*\s*(.+?)(?=\s*Applicant:)",
+        r"RC[0-9]{5,}",
+        # ... your other patterns ...
     ]
     rc_matches = []
     for pattern in rc_patterns:
-        rc_matches.extend(re.findall(pattern, text, re.DOTALL | re.MULTILINE | re.IGNORECASE))
+        rc_matches.extend(re.findall(pattern, text, flags=re.IGNORECASE | re.DOTALL))
+    # ... flatten and dedupe rc_matches into rc_str ...
 
-    # Flatten list of lists/tuples that re.findall might return
-    flattened_rc_matches = []
-    for item in rc_matches:
-        if isinstance(item, tuple):
-            flattened_rc_matches.append(item[-1])
-        else:
-            flattened_rc_matches.append(item)
-    rc_str = ", ".join(list(dict.fromkeys(flattened_rc_matches)))
+    # --- Continue with other metadata extraction (company, address, expiry, etc.) ---
+    # ... your existing code for expiry, geocoding, triggers, etc. ...
 
-    # Company name patterns
-    company_patterns = [
-        r"Applicant:\s*(.+?)(?=\s*Site address)",
-        r"Applicant's name:\s*(.+?)(?=\s*Site address)"
-    ]
-    company_matches = []
-    for pattern in company_patterns:
-        company_matches.extend(re.findall(pattern, text, re.MULTILINE | re.DOTALL))
-    company_str = ", ".join(list(dict.fromkeys(company_matches)))
+    # Format outputs
+    return {
+        "Issue Date": issue_date.strftime("%d-%m-%Y") if issue_date else "Unknown Issue Date",
+        # include other fields here, e.g. "Resource Consent Numbers": rc_str, etc.
+    }
 
     # Address patterns
     address_pattern = r"Site address:\s*(.+?)(?=\s*Legal description)"
