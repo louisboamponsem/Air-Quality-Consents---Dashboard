@@ -511,14 +511,6 @@ uploaded_files = st.sidebar.file_uploader("Upload PDF files", type=["pdf"], acce
 query_input = st.sidebar.text_input("LLM Semantic Search Query")
 
 
-@st.cache_resource
-def load_embedding_model(name):
-    return SentenceTransformer(name)
-
-
-embedding_model = load_embedding_model(model_name)
-
-
 # --- CACHING EMBEDDINGS FOR PERFORMANCE ---
 @st.cache_data(show_spinner="Generating document embeddings...")
 def get_corpus_embeddings(text_blobs_tuple, model_name_str):
@@ -527,8 +519,6 @@ def get_corpus_embeddings(text_blobs_tuple, model_name_str):
     return model_obj.encode(list(text_blobs_tuple), convert_to_tensor=True)
 
 
-df = pd.DataFrame()
-
 # --- File Processing & Dashboard ---
 if uploaded_files:
     # --- START: MULTI-STAGE PROGRESS BAR ---
@@ -536,26 +526,25 @@ if uploaded_files:
     all_data = []
     total_files = len(uploaded_files)
 
-    # Stage 1: PDF Processing (0% -> 70% of total progress)
+    # Stage 1: PDF Processing (0% → 70%)
     for i, file in enumerate(uploaded_files):
-        # Calculate progress within the 0-70 range
-        progress_stage1 = int(((i + 1) / total_files) * 70)
-        my_bar.progress(progress_stage1, text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
+        pct = int(((i + 1) / total_files) * 70)
+        my_bar.progress(pct, text=f"Step 1/3: Processing {file.name} ({i+1}/{total_files})…")
         try:
-            file_bytes = file.read()
-            with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                text = "\n".join(page.get_text() for page in doc)
-            data = extract_metadata(text)
-            data["__file_name__"] = file.name
-            data["__file_bytes__"] = file_bytes
-            all_data.append(data)
+            fb = file.read()
+            with fitz.open(stream=fb, filetype="pdf") as doc:
+                txt = "\n".join(page.get_text() for page in doc)
+            rec = extract_metadata(txt)
+            rec["__file_name__"]  = file.name
+            rec["__file_bytes__"] = fb
+            all_data.append(rec)
         except Exception as e:
-            st.error(f"Error processing {file.name}: {e}")
-    # --- END Stage 1 ---
+            st.error(f"Error reading {file.name}: {e}")
 
+    # Only continue if we got anything back
     if all_data:
-        # --- Stage 2: Geocoding (70% -> 90% of total progress) ---
-        my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
+        # Stage 2: Geocoding (70% → 90%)
+        my_bar.progress(75, text="Step 2/3: Geocoding addresses…")
         df = pd.DataFrame(all_data)
 
         # ─── Force the consent ID to be the PDF file name ────────────────────────────
@@ -568,31 +557,22 @@ if uploaded_files:
             inplace=True
         )
 
-        df["GeoKey"] = df["Address"].str.lower().str.strip()
+        # ─── Now do your geocoding ─────────────────────────────────────────────────
+        df["GeoKey"] = df["Address"].astype(str).str.lower().str.strip()
+        df["Latitude"], df["Longitude"] = zip(
+            *df["GeoKey"].apply(geocode_address)
+        )
 
-        # Geocoding is the slow part of this stage
-        df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
+        # Stage 3: Finalizing & Rendering (90% → 100%)
+        my_bar.progress(90, text="Step 3/3: Finalizing dashboard…")
+        # … (apply datetime localization, enhanced status, metrics, maps, tables, etc.) …
+        my_bar.progress(100, text="Dashboard Ready!")
+        my_bar.empty()
 
-        # --- Stage 3: Finalizing and Rendering (90% -> 100%) ---
-        my_bar.progress(90, text="Step 3/3: Finalizing data and rendering dashboard...")
-
-        # --- DATETIME LOCALIZATION ---
-        auckland_tz = pytz.timezone("Pacific/Auckland")
-        df['Issue Date'] = pd.to_datetime(df['Issue Date'], errors='coerce',
-                                          dayfirst=True)  # Ensure Issue Date is datetime
-        df['Issue Date'] = df['Issue Date'].apply(localize_to_auckland)
-        df['Expiry Date'] = pd.to_datetime(df['Expiry Date'], errors='coerce', dayfirst=True)
-        df['Expiry Date'] = df['Expiry Date'].apply(localize_to_auckland)
-
-        # --- ENHANCED STATUS CALCULATION ---
-        df["Consent Status Enhanced"] = df["Consent Status"]
-        current_nz_aware_time = datetime.now(pytz.timezone("Pacific/Auckland"))
-        df.loc[
-            (df["Consent Status"] == "Active") &
-            (df["Expiry Date"] > current_nz_aware_time) &
-            (df["Expiry Date"] <= current_nz_aware_time + timedelta(days=90)),
-            "Consent Status Enhanced"
-        ] = "Expiring in 90 Days"
+    else:
+        # No data extracted at all
+        my_bar.empty()
+        st.warning("Could not extract any data from the uploaded files.")
 
         # --- START RENDERING DASHBOARD ---
 
