@@ -558,34 +558,34 @@ if uploaded_files:
         my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
         df = pd.DataFrame(all_data)
 
-        # ─── Turn the internal filename into your “Resource Consent Numbers” ───────────
-        df.rename(
-            columns={"__file_name__": "Resource Consent Numbers"},
-            inplace=True
-        )
-        # ─── Drop any unwanted internal columns ────────────────────────────────────────
-        df.drop(
-            columns=["Consent Condition Numbers"],
-            errors="ignore",
-            inplace=True
-        )
+        # ─── 1) Rename internal filename → your consent ID ─────────────────────────────
+        df.rename(columns={"__file_name__": "Resource Consent Numbers"}, inplace=True)
 
-        # ─── Alias any parser-output “Site Address” to exactly “Address” ───────────────
+        # ─── 2) Drop any unwanted internal columns ─────────────────────────────────────
+        for col in ["Consent Condition Numbers"]:
+            if col in df.columns:
+                df.drop(columns=[col], inplace=True)
+
+        # ─── 3) Alias parser‐output address fields to exactly "Address" ────────────────
         if "Site Address" in df.columns:
             df.rename(columns={"Site Address": "Address"}, inplace=True)
+        elif "Address Line 1" in df.columns:
+            df.rename(columns={"Address Line 1": "Address"}, inplace=True)
+        # If neither exists, create an empty Address column to avoid downstream errors
+        elif "Address" not in df.columns:
+            df["Address"] = ""
 
-        # (Optional) debug: show available columns
+        # (Optional debugging)
         # st.write("Columns before geocoding:", df.columns.tolist())
 
-        # ─── Prepare for geocoding ──────────────────────────────────────────────────────
-        df["GeoKey"] = df["Address"].str.lower().str.strip()
+        # ─── 4) Prepare and execute geocoding ────────────────────────────────────────────
+        df["GeoKey"] = df["Address"].astype(str).str.lower().str.strip()
         df["Latitude"], df["Longitude"] = zip(
             *df["GeoKey"].apply(geocode_address)
         )
 
         # --- Stage 3: Finalizing and Rendering (90% -> 100%) ---
         my_bar.progress(90, text="Step 3/3: Finalizing data and rendering dashboard...")
-
 
 
         # --- DATETIME LOCALIZATION ---
