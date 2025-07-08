@@ -553,15 +553,25 @@ if uploaded_files:
     # --- END Stage 1 ---
 
     if all_data:
-        # --- Stage 2: Geocoding (70% -> 90% of total progress) ---
+        # --- Stage 2: Geocoding (70% → 90% of total progress) ---
         my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
+
+        # Build DataFrame from all_data
         df = pd.DataFrame(all_data)
+
+        # ——— Inject Consent Number from the uploaded PDF filename ———
+        # (Requires that you saved each file’s name into data['__file_name__'])
+        import os  # make sure os is imported at the top of your file
+
+        df['Consent Number'] = (
+            df['__file_name__']
+            .apply(lambda fn: os.path.splitext(os.path.basename(fn))[0])
+        )
+
+        # Prepare for geocoding
         df["GeoKey"] = df["Address"].str.lower().str.strip()
         # Geocoding is the slow part of this stage
         df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
-
-        # --- Stage 3: Finalizing and Rendering (90% -> 100%) ---
-        my_bar.progress(90, text="Step 3/3: Finalizing data and rendering dashboard...")
 
         # --- DATETIME LOCALIZATION ---
         auckland_tz = pytz.timezone("Pacific/Auckland")
