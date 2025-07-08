@@ -735,6 +735,81 @@ if uploaded_files:
             my_bar.progress(90, text="Geocoding complete.")
 
         # --- Consent Table Render ---
+        def extract_metadata(text: str, filename: str) -> dict:
+            # Initialize metadata dict
+            meta = {}
+
+            # 1. Extract DIS-prefixed consent numbers
+            dis_matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
+            if dis_matches:
+                if len(dis_matches) == 1:
+                    consent = dis_matches[0]
+                else:
+                    lower_text = (text or "").lower()
+                    air_idx = lower_text.find("air")
+                    if air_idx != -1:
+                        consent = min(
+                            dis_matches,
+                            key=lambda m: abs(lower_text.find(m.lower()) - air_idx)
+                        )
+                    else:
+                        consent = dis_matches[0]
+                meta["Consent Number"] = consent.upper().strip()
+            else:
+                # Fallback to filename (no .pdf)
+                meta["Consent Number"] = os.path.splitext(os.path.basename(filename))[0]
+
+            # 2. (Optional) extract other fields from text, e.g. Company Name, Address
+            #    Insert your existing parsing logic here, populating keys like:
+            #    meta["Company Name"], meta["Address"], meta["Issue Date"], etc.
+
+            return meta
+
+
+        # --- File Upload & Parsing ---
+        uploaded_files = st.sidebar.file_uploader(
+            "Upload PDF decision reports", type=["pdf"], accept_multiple_files=True
+        )
+        all_data = []
+        if uploaded_files:
+            my_bar = st.progress(0, text="Starting processing...")
+            for idx, uploaded_file in enumerate(uploaded_files, start=1):
+                my_bar.progress(int((idx - 1) / len(uploaded_files) * 50),
+                                text=f"Reading PDF {idx}/{len(uploaded_files)}...")
+                # Read PDF bytes and extract full text
+                pdf_bytes = uploaded_file.read()
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                full_text = "".join(page.get_text() for page in doc)
+
+                # Extract metadata, passing filename for fallback
+                meta = extract_metadata(full_text, uploaded_file.name)
+
+                # Store raw filename if needed
+                meta["__file_name__"] = uploaded_file.name
+                all_data.append(meta)
+            my_bar.progress(50, text="Finished reading PDFs.")
+
+        # --- Stage 2: Build DataFrame & Geocode ---
+        if all_data:
+            df = pd.DataFrame(all_data)
+            # Map Address if you extracted it
+            my_bar.progress(60, text="Preparing addresses for geocoding...")
+            if "Address" in df.columns:
+                df["GeoKey"] = df["Address"].str.lower().str.strip()
+                geolocator = Nominatim(user_agent="consent_app")
+                rate_limiter = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+                df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(
+                    lambda x: geolocator.geocode(x) and (geolocator.geocode(x).latitude,
+                                                         geolocator.geocode(x).longitude)))
+            my_bar.progress(90, text="Geocoding complete.")
+
+            # ───── Filter to only Air Discharge consents (DIS...) ─────
+            if 'Consent Number' in df.columns:
+                df = df[df['Consent Number'].str.upper().str.startswith('DIS')].reset_index(drop=True)
+            else:
+                st.warning("Consent Number column missing—cannot filter for DIS consents.")
+
+        # --- Consent Table Render ---
         if all_data and not df.empty:
             with st.expander("Consent Table", expanded=True):
                 status_filter = st.selectbox(
