@@ -666,38 +666,35 @@ if uploaded_files:
         st.plotly_chart(fig_status, use_container_width=True)
 
         # --- Consent Table ---
-        def extract_air_dis_number(text, filename):
-            # Find all DIS-prefixed numbers in text
+        def extract_air_dis_number(text):
+            # find all DIS-prefixed consent numbers
             matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
             if not matches:
-                # Fallback to filename if none found
-                return os.path.splitext(os.path.basename(filename))[0]
+                return None
             if len(matches) == 1:
                 return matches[0].upper()
-            # If multiple, pick the one closest to the word "air"
+            # multiple matches: pick the one closest to the word 'air'
             lower_text = (text or "").lower()
             air_pos = lower_text.find('air')
             if air_pos != -1:
+                # choose match minimizing distance to 'air'
                 return min(
                     matches,
                     key=lambda m: abs(lower_text.find(m.lower()) - air_pos)
                 ).upper()
-            # If "air" not present, default to first match
+            # fallback to first if 'air' not found
             return matches[0].upper()
 
 
-        # Apply extraction to DataFrame after it's built
+        # Apply extraction immediately after building df
         if 'df' in locals():
-            if 'text' in df.columns and '__file_name__' in df.columns:
-                df['Consent Number'] = df.apply(
-                    lambda row: extract_air_dis_number(row['text'], row['__file_name__']),
-                    axis=1
-                )
+            if 'text' in df.columns:
+                # extract DIS consent numbers and drop rows without one
+                df['Consent Number'] = df['text'].apply(extract_air_dis_number)
+                # keep only the air discharge consents
+                df = df[df['Consent Number'].notnull()].reset_index(drop=True)
             else:
-                # Fallback entirely to filename-based number
-                df['Consent Number'] = df.get(
-                    '__file_name__', pd.Series()
-                ).apply(lambda fn: os.path.splitext(os.path.basename(fn))[0])
+                st.warning("Unable to find text in DataFrame—cannot extract DIS consent numbers.")
 
         # Now render the consent table only if DataFrame is ready
         if 'df' in locals() and not df.empty:
@@ -717,7 +714,7 @@ if uploaded_files:
                     df["Consent Status Enhanced"] == status_filter]
                 # 4) Define exactly the columns to show
                 columns_to_display = [
-                    "Consent Number",  # from text extraction
+                    "Consent Number",  # extracted DIS number
                     "Company Name",
                     "Address",
                     "Issue Date",
@@ -737,7 +734,7 @@ if uploaded_files:
                 csv_output = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
         else:
-            st.warning("No consent data available. Please upload PDF files or check processing logs.")
+            st.warning("No air discharge consent data available. Please upload relevant PDF files.")
 
         # Consent Map
         with st.expander("Consent Map", expanded=True):
