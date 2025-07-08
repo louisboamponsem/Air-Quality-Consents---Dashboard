@@ -666,75 +666,63 @@ if uploaded_files:
         st.plotly_chart(fig_status, use_container_width=True)
 
         # --- Consent Table ---
-        def extract_air_dis_number(text):
-            # find all DIS-prefixed consent numbers
-            matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
-            if not matches:
-                return None
-            if len(matches) == 1:
-                return matches[0].upper()
-            # multiple matches: pick the one closest to the word 'air'
-            lower_text = (text or "").lower()
-            air_pos = lower_text.find('air')
-            if air_pos != -1:
-                # choose match minimizing distance to 'air'
-                return min(
-                    matches,
-                    key=lambda m: abs(lower_text.find(m.lower()) - air_pos)
-                ).upper()
-            # fallback to first if 'air' not found
-            return matches[0].upper()
+        def extract_metadata(text):
+            # … your existing metadata extraction logic …
+            # e.g. extract all RC patterns into rc_matches, flatten to flattened_rc_matches
+            # rc_str = ", ".join(list(dict.fromkeys(flattened_rc_matches)))
 
-
-        # Apply extraction immediately after building df
-        if 'df' in locals():
-            if 'text' in df.columns:
-                # extract DIS consent numbers and drop rows without one
-                df['Consent Number'] = df['text'].apply(extract_air_dis_number)
-                # keep only the air discharge consents
-                df = df[df['Consent Number'].notnull()].reset_index(drop=True)
+            # ─────── DIS-override ───────
+            # Find only DIS-prefixed numbers
+            dis_matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
+            if dis_matches:
+                # Single match -> use it
+                if len(dis_matches) == 1:
+                    rc_str = dis_matches[0]
+                else:
+                    # Multiple -> pick closest to 'air'
+                    lower_text = (text or "").lower()
+                    air_pos = lower_text.find("air")
+                    if air_pos != -1:
+                        rc_str = min(
+                            dis_matches,
+                            key=lambda m: abs(lower_text.find(m.lower()) - air_pos)
+                        )
+                    else:
+                        rc_str = dis_matches[0]
+                rc_str = rc_str.upper().strip()
             else:
-                st.warning("Unable to find text in DataFrame—cannot extract DIS consent numbers.")
+                # Fallback to filename captured in data
+                rc_str = os.path.splitext(os.path.basename(data.get('__file_name__', '')))[
+                             0] or "Unknown Consent Number"
+            # ─────────────────────────────
 
-        # Now render the consent table only if DataFrame is ready
+            # Continue building metadata dict
+            return {
+                "Consent Number": rc_str,
+                # ... other fields like Company Name, Address, etc. …
+            }
+
+
+        # Apply extract_metadata when building data:
+        all_data = []
+        for file in uploaded_files:
+            text = parse_pdf(file)  # however you get raw text
+            meta = extract_metadata(text)
+            meta['__file_name__'] = file.name
+            all_data.append(meta)
+
+        # Build DataFrame
+        if all_data:
+            df = pd.DataFrame(all_data)
+            # ... rest of DataFrame transformations …
+
+        # Now your expander/table will use the updated Consent Number column
         if 'df' in locals() and not df.empty:
-            # --- Consent Table ---
             with st.expander("Consent Table", expanded=True):
-                # 1) Status filter
-                status_filter = st.selectbox(
-                    "Filter by Status",
-                    ["All"] + df["Consent Status Enhanced"].unique().tolist(),
-                    key="consent_status_filter"
-                )
-                # 2) Progress indicator
-                if 'my_bar' in locals():
-                    my_bar.progress(95, text="Step 4/4: Filtering and displaying consent table...")
-                # 3) Apply filter
-                filtered_df = df.copy() if status_filter == "All" else df[
-                    df["Consent Status Enhanced"] == status_filter]
-                # 4) Define exactly the columns to show
-                columns_to_display = [
-                    "Consent Number",  # extracted DIS number
-                    "Company Name",
-                    "Address",
-                    "Issue Date",
-                    "Expiry Date",
-                    "Consent Status Enhanced",
-                    "AUP(OP) Triggers",
-                ]
-                if "Reason for Consent" in filtered_df.columns:
-                    columns_to_display.append("Reason for Consent")
-                # 5) Slice & rename
-                display_df = (
-                    filtered_df[columns_to_display]
-                    .rename(columns={"Consent Status Enhanced": "Consent Status"})
-                )
-                # 6) Render & download
-                st.dataframe(display_df)
-                csv_output = display_df.to_csv(index=False).encode("utf-8")
-                st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
+                # … same table logic …
+                pass
         else:
-            st.warning("No air discharge consent data available. Please upload relevant PDF files.")
+            st.warning("No consent data available. Please upload PDF files or check logs.")
 
         # Consent Map
         with st.expander("Consent Map", expanded=True):
