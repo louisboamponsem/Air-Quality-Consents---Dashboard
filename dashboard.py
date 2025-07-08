@@ -666,13 +666,38 @@ if uploaded_files:
         st.plotly_chart(fig_status, use_container_width=True)
 
         # --- Consent Table ---
+        def extract_air_dis_number(text, filename):
+            # Find all DIS-prefixed numbers in text
+            matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
+            if not matches:
+                # Fallback to filename if none found
+                return os.path.splitext(os.path.basename(filename))[0]
+            if len(matches) == 1:
+                return matches[0].upper()
+            # If multiple, pick the one closest to the word "air"
+            lower_text = (text or "").lower()
+            air_pos = lower_text.find('air')
+            if air_pos != -1:
+                return min(
+                    matches,
+                    key=lambda m: abs(lower_text.find(m.lower()) - air_pos)
+                ).upper()
+            # If "air" not present, default to first match
+            return matches[0].upper()
+
+
+        # Apply extraction to DataFrame after it's built
         if 'df' in locals():
-            if 'filename' in df.columns:
-                df['Consent Number'] = df['filename'].apply(lambda x: os.path.splitext(os.path.basename(x))[0])
-            elif '__file_name__' in df.columns:
-                df['Consent Number'] = df['__file_name__'].apply(lambda x: os.path.splitext(os.path.basename(x))[0])
+            if 'text' in df.columns and '__file_name__' in df.columns:
+                df['Consent Number'] = df.apply(
+                    lambda row: extract_air_dis_number(row['text'], row['__file_name__']),
+                    axis=1
+                )
             else:
-                st.warning("No filename column found; cannot extract Consent Number.")
+                # Fallback entirely to filename-based number
+                df['Consent Number'] = df.get(
+                    '__file_name__', pd.Series()
+                ).apply(lambda fn: os.path.splitext(os.path.basename(fn))[0])
 
         # Now render the consent table only if DataFrame is ready
         if 'df' in locals() and not df.empty:
@@ -692,7 +717,7 @@ if uploaded_files:
                     df["Consent Status Enhanced"] == status_filter]
                 # 4) Define exactly the columns to show
                 columns_to_display = [
-                    "Consent Number",  # from file name
+                    "Consent Number",  # from text extraction
                     "Company Name",
                     "Address",
                     "Issue Date",
@@ -712,8 +737,7 @@ if uploaded_files:
                 csv_output = display_df.to_csv(index=False).encode("utf-8")
                 st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
         else:
-            st.warning("No consent data available. Please upload PDF files or check processing logs.")(
-                "No consent data available. Please upload PDF files or check processing logs.")
+            st.warning("No consent data available. Please upload PDF files or check processing logs.")
 
         # Consent Map
         with st.expander("Consent Map", expanded=True):
