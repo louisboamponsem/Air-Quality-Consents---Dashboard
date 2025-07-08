@@ -545,6 +545,19 @@ if uploaded_files:
         st.plotly_chart(fig_status, use_container_width=True)
 
         # --- Consent Table ---
+        if 'df' in locals() and consents:
+            # If df rows align one-to-one with uploaded files, insert consent numbers directly
+            if len(df) == len(consents):
+                df.insert(0, 'Consent Number', consents)
+            else:
+                # Otherwise, derive consent number from an existing filename column
+                if 'filename' in df.columns:
+                    df['Consent Number'] = df['filename'].apply(lambda x: os.path.splitext(os.path.basename(x))[0])
+                else:
+                    st.warning(
+                        "Could not map consent numbers to DataFrame rows. Ensure each row has a corresponding filename or that row count matches uploads.")
+
+        # Now you can safely reference 'Consent Number' in your expander table
         with st.expander("Consent Table", expanded=True):
             # 1) Status filter
             status_filter = st.selectbox(
@@ -577,7 +590,6 @@ if uploaded_files:
             st.dataframe(display_df)
             csv_output = display_df.to_csv(index=False).encode("utf-8")
             st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
-
         # Consent Map
         with st.expander("Consent Map", expanded=True):
             map_df = df.dropna(subset=["Latitude", "Longitude"])
