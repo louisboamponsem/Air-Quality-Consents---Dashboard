@@ -201,7 +201,6 @@ def extract_metadata(text):
 
                 data = extract_metadata(text)
 
-                import os
                 consent_number_from_filename = os.path.splitext(file.name)[0]
                 if consent_number_from_filename:
                     data["Resource Consent Numbers"] = consent_number_from_filename
