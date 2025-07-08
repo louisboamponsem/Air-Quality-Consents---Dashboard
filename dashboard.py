@@ -185,6 +185,21 @@ def geocode_address(address):
 
 
 def extract_metadata(text):
+    file_bytes = file.read()
+    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+        text = "\n".join(page.get_text() for page in doc)
+    data = extract_metadata(text)
+
+    # --- ADD THIS LINE BELOW ---
+    import os
+    consent_number_from_filename = os.path.splitext(file.name)[0]  # Strip off .pdf extension
+    if consent_number_from_filename:
+        data["Resource Consent Numbers"] = consent_number_from_filename
+    # --------------------------------
+
+    data["__file_name__"] = file.name
+    data["__file_bytes__"] = file_bytes
+    all_data.append(data)
     # RC number patterns
     rc_patterns = [
         r"Application number:\s*(.+?)(?=\s*Applicant:)",
