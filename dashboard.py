@@ -368,80 +368,9 @@ def extract_metadata(text):
         proposal.extend(re.findall(pattern, text, re.MULTILINE | re.DOTALL))
     proposal_str = "".join(list(dict.fromkeys(proposal)))
 
-    # Conditions (consolidated pattern for broader capture)
-    conditions_patterns = [
-        r"(?:Specific conditions - Air Discharge DIS\d{5,}(?:-\w+)?\b).*?(?=Specific conditions -)",
-        r"(?:Air Quality conditions).*?(?=Wastewater Discharge conditions)",
-        r"(?:Air Discharge Permit Conditions).*?(?=E\. Definitions)",
-        r"(?:Air discharge - DIS\d{5,}(?:-\w+)?\b).*?(?=DIS\d{5,}(?:-\w+)?\b)",
-        r"(?:Specific conditions - DIS\d{5,}(?:-\w+)?\b (s15 Air Discharge permit)).*?(?=Advice notes)",
-        r"(?:Conditions Specific to air quality).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge - DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:regional discharge DIS\d{5,}(?:-w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - discharge permit DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge consent DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Consolidated conditions of consent as amended).*?(?=Advice notes)",
-        r"(?:Specific conditions - Air Discharge DIS\d{5,}\b).*?(?=Advice notes)",
-        r"(?:Air discharge - DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:DIS\d{5,}(?:-\w+)?\b - Specific conditions).*?(?=Advice notes)",
-        r"(?:DIS\d{5,}(?:-\w+)?\b - Specific conditions).*?(?=DIS\d{5,}(?:-\w+)?\b - Specific conditions)",
-        r"(?:Specific Conditions - DIS\d{5,}(?:-\w+)?\b (s15 Air Discharge permit)).*?(?=Advice notes)",
-        r"(?:Conditions relevant to Air Discharge Permit DIS\d{5,}(?:-\w+)?\b Only).*?(?=Advice notes)",
-        r"(?:Conditions relevant to Air Discharge Permit DIS\d{5,}(?:-\w+)?\b).*?(?=Specific Conditions -)",
-        r"(?:SPECIFIC CONDITIONS - DISCHARGE TO AIR DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Conditions relevant to Discharge Permit DIS\d{5,}(?:-\w+)?\b only).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge permit DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge permit (DIS\d{5,}(?:-\w+)?\b)).*?(?=Advice notes)",
-        r"(?:Specific conditions - DIS\d{5,}(?:-\w+)?\b (air)).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge consent DIS\d{5,}(?:-\w+)?\b).*?(?=Specifc conditions)",
-        r"(?:Attachment 1: Consolidated conditions of consent as amended).*?(?=Advice notes)",
-        r"(?:Specific Air Discharge Conditions).*?(?=Advice notes)",
-        r"(?:Specific conditions - Discharge to Air: DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - discharge permit (air discharge) DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Air Discharge Limits).*?(?= Acoustic Conditions)",
-        r"(?:Specific conditions - discharge consent DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge permit (s15) DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific conditions - air discharge permit DIS\d{5,}(?:-\w+)?\b).*?(?=Secific conditions)",
-        r"(?:Specific conditions relating to Air discharge permit - DIS\d{5,}(?:-\w+)?\b).*?(?=General Advice notes)",
-        r"(?:Specific conditions - Discharge permit (s15) - DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:Specific Conditions - discharge consent DIS\d{5,}(?:-\w+)?\b).*?(?=Specific conditions)",
-        r"(?:Specific conditions - Discharge to air: DIS\d{5,}(?:-\w+)?\b).*?(?=Specific conditions)",
-        r"(?:Attachement 1: Consolidated conditions of consent as amended).*?(?=Resource Consent Notice of Works Starting)",
-        r"(?:Specific conditions - Air Discharge consent - DIS\d{5,}(?:-\w+)?\b).*?(?=Specific conditions)",
-        r"(?:Specific conditions - Discharge consent DIS\d{5,}(?:-\w+)?\b).*?(?=Advice notes)",
-        r"(?:DIS\d{5,}(?:-\w+)?\b - Air Discharge).*?(?=SUB\d{5,}\b) - Subdivision",
-        r"(?:DIS\d{5,}(?:-\w+)?\b & DIS\d{5,}(?:-\w+)?\b).*?(?=SUB\d{5,}\b) - Subdivision",
-        r"(?:Specific conditions - Discharge Permit DIS\d{5,}(?:-\w+)?\b).*?(?=Advice Notes - General)",
-        r"(?:AIR QUALITY - ROCK CRUSHER).*?(?=GROUNDWATER)",
-        # Fallback broad pattern if specific ones fail
-        r"(?<=Conditions).*?(?=Advice notes)"
-    ]
-
-    conditions_str = ""
-    for pattern in conditions_patterns:
-        conditions_match = re.search(pattern, text, re.MULTILINE | re.DOTALL | re.IGNORECASE)
-        if conditions_match:
-            conditions_str = conditions_match.group(0).strip()
-            break
-
-    conditions_numbers = []
-    if conditions_str:
-        temp_conditions_matches = re.findall(r"^\s*(\d+\.?\d*)\s*[A-Z].*?(?=\n\s*\d+\.?\d*\s*[A-Z]|\Z)", conditions_str,
-                                             re.MULTILINE | re.DOTALL)
-        flattened_temp_conditions = []
-        for item in temp_conditions_matches:
-            if isinstance(item, tuple):
-                flattened_temp_conditions.append(item[0])
-            else:
-                flattened_temp_conditions.append(item)
-
-        conditions_numbers = [re.match(r'^(\d+\.?\d*)', cn.strip()).group(1) for cn in flattened_temp_conditions if
-                              isinstance(cn, str) and re.match(r'^(\d+\.?\d*)', cn.strip())]
-        conditions_numbers = list(dict.fromkeys(conditions_numbers))
 
     return {
-        "Resource Consent Numbers": rc_str if rc_str else "Unknown Resource Consent Numbers",
+        "Consent Number": rc_str if rc_str else "Unknown Resource Consent Numbers",
         "Company Name": company_str if company_str else "Unknown Company Name",
         "Address": address_str if address_str else "Unknown Address",
         "Issue Date": issue_date.strftime("%d-%m-%Y") if issue_date else "Unknown Issue Date",
@@ -449,10 +378,6 @@ def extract_metadata(text):
         # Use `expiry_str` if `expiry_date` is None
         "AUP(OP) Triggers": triggers_str if triggers_str else "Unknown AUP Triggers",
         "Reason for Consent": proposal_str if proposal_str else "Unknown Reason for Consent",
-        "Consent Condition Numbers": ", ".join(
-            conditions_numbers) if conditions_numbers else "Unknown Condition Numbers",
-        "Consent Conditions": conditions_str if conditions_str else "Unknown Consent Conditions",
-        # Use extracted string for conditions
         "Consent Status": check_expiry(expiry_date),
         "Text Blob": text
     }
