@@ -186,45 +186,32 @@ def geocode_address(address):
 
 def extract_metadata(text):
     # --- 1) DIS-number selection logic (inserted) ---
-    # pull out all DIS-numbers
     all_dis = re.findall(r"\bDIS\d{5,}\b", text)
 
-    # choose the one with "air" within ±50 characters
     chosen_dis = None
     for dis in all_dis:
         for m in re.finditer(re.escape(dis), text):
-            snippet = text[max(0, m.start() - 50): m.end() + 50].lower()
+            snippet = text[max(0, m.start() - 50) : m.end() + 50].lower()
             if "air" in snippet:
                 chosen_dis = dis
                 break
         if chosen_dis:
             break
 
-    # fallback to first DIS if none matched
     if not chosen_dis and all_dis:
         chosen_dis = all_dis[0]
 
-    # if found, return immediately with DIS as Consent Number
     if chosen_dis:
         return {
             "Consent Number": chosen_dis,
-            # add other extracted fields here if needed:
-            # "Company Name": extract_company(text),
-            # "Address": extract_address(text),
-            # ... etc.
+            # … merge in your other field-extraction calls here …
         }
 
     # --- 2) original RC/LUC/BUN logic (unchanged) ---
-    # RC number patterns
     rc_patterns = [
         r"Application number:\s*(.+?)(?=\s*Applicant:)",
         r"Application numbers:\s*(.+?)(?=\s*Applicant:)",
-        r"Application number(s):\s*(.+?)(?=\s*Applicant:)",
-        r"Application number:\s*(.+?)(?=\s*Original consent)",
-        r"Application numbers:\s*(.+?)(?=\s*Original consent)",
-        r"Application number:\s*(.+?)(?=\s*Site address:)",
-        r"Application numbers:\s*(.+?)(?=\s*Site address:)",
-        r"Application number(s):\s*(.+?)(?=\s*Site address:)",
+        # … all your existing patterns …
         r"RC[0-9]{5,}"
     ]
     rc_matches = []
