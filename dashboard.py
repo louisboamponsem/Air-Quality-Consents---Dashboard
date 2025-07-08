@@ -185,7 +185,6 @@ def geocode_address(address):
 
 
 def extract_metadata(text):
-
     # RC number patterns
     rc_patterns = [
         r"Application number:\s*(.+?)(?=\s*Applicant:)",
@@ -457,26 +456,32 @@ df = pd.DataFrame()
 
 # --- File Processing & Dashboard ---
 if uploaded_files:
-    # --- START: MULTI-STAGE PROGRESS BAR ---
     my_bar = st.progress(0, text="Initializing...")
     all_data = []
     total_files = len(uploaded_files)
 
-    # Stage 1: PDF Processing (0% -> 70% of total progress)
     for i, file in enumerate(uploaded_files):
-        # Calculate progress within the 0-70 range
         progress_stage1 = int(((i + 1) / total_files) * 70)
         my_bar.progress(progress_stage1, text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
         try:
+            file.seek(0)
             file_bytes = file.read()
             with fitz.open(stream=file_bytes, filetype="pdf") as doc:
                 text = "\n".join(page.get_text() for page in doc)
-            data = extract_metadata(text)
+
+            data = extract_metadata(text)  # Only extract from text
+
+            # Use filename as consent number
+            data["Resource Consent Numbers"] = os.path.splitext(file.name)[0]
+
             data["__file_name__"] = file.name
             data["__file_bytes__"] = file_bytes
             all_data.append(data)
+
         except Exception as e:
             st.error(f"Error processing {file.name}: {e}")
+
+    df = pd.DataFrame(all_data)
     # --- END Stage 1 ---
 
     if all_data:
@@ -544,36 +549,6 @@ if uploaded_files:
         fig_status.update_traces(textposition="outside")
         fig_status.update_layout(title="Consent Status Overview", title_x=0.5)
         st.plotly_chart(fig_status, use_container_width=True)
-        if uploaded_files:
-            my_bar = st.progress(0, text="Initializing...")
-            all_data = []
-            total_files = len(uploaded_files)
-
-            for i, file in enumerate(uploaded_files):
-                progress_stage1 = int(((i + 1) / total_files) * 70)
-                my_bar.progress(progress_stage1,
-                                text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
-                try:
-                    file.seek(0)  # Ensure stream is at the beginning
-                    file_bytes = file.read()
-                    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                        text = "\n".join(page.get_text() for page in doc)
-
-                    data = extract_metadata(text)  # Only call this with text!
-
-                    # Use filename as Consent Number
-                    import os
-
-                    consent_number_from_filename = os.path.splitext(file.name)[0]
-                    if consent_number_from_filename:
-                        data["Resource Consent Numbers"] = consent_number_from_filename
-
-                    data["__file_name__"] = file.name
-                    data["__file_bytes__"] = file_bytes
-                    all_data.append(data)
-
-                except Exception as e:
-                    st.error(f"Error processing {file.name}: {e}")
 
         # --- Consent Table ---
         with st.expander("Consent Table", expanded=True):
