@@ -666,64 +666,93 @@ if uploaded_files:
         st.plotly_chart(fig_status, use_container_width=True)
 
         # --- Consent Table ---
-        def extract_metadata(text):
-            # … your existing metadata extraction logic …
-            # e.g. extract all RC patterns into rc_matches, flatten to flattened_rc_matches
-            # rc_str = ", ".join(list(dict.fromkeys(flattened_rc_matches)))
+        def extract_metadata(text: str, filename: str) -> dict:
+            # Initialize metadata dict
+            meta = {}
 
-            # ─────── DIS-override ───────
-            # Find only DIS-prefixed numbers
+            # 1. Extract DIS-prefixed consent numbers
             dis_matches = re.findall(r"\bDIS\d+\b", text or "", flags=re.IGNORECASE)
             if dis_matches:
-                # Single match -> use it
                 if len(dis_matches) == 1:
-                    rc_str = dis_matches[0]
+                    consent = dis_matches[0]
                 else:
-                    # Multiple -> pick closest to 'air'
                     lower_text = (text or "").lower()
-                    air_pos = lower_text.find("air")
-                    if air_pos != -1:
-                        rc_str = min(
+                    air_idx = lower_text.find("air")
+                    if air_idx != -1:
+                        consent = min(
                             dis_matches,
-                            key=lambda m: abs(lower_text.find(m.lower()) - air_pos)
+                            key=lambda m: abs(lower_text.find(m.lower()) - air_idx)
                         )
                     else:
-                        rc_str = dis_matches[0]
-                rc_str = rc_str.upper().strip()
+                        consent = dis_matches[0]
+                meta["Consent Number"] = consent.upper().strip()
             else:
-                # Fallback to filename captured in data
-                rc_str = os.path.splitext(os.path.basename(data.get('__file_name__', '')))[
-                             0] or "Unknown Consent Number"
-            # ─────────────────────────────
+                # Fallback to filename (no .pdf)
+                meta["Consent Number"] = os.path.splitext(os.path.basename(filename))[0]
 
-            # Continue building metadata dict
-            return {
-                "Consent Number": rc_str,
-                # ... other fields like Company Name, Address, etc. …
-            }
+            # 2. (Optional) extract other fields from text, e.g. Company Name, Address
+            #    Insert your existing parsing logic here, populating keys like:
+            #    meta["Company Name"], meta["Address"], meta["Issue Date"], etc.
+
+            return meta
 
 
-        # Apply extract_metadata when building data:
+        # --- File Upload & Parsing ---
+        uploaded_files = st.sidebar.file_uploader(
+            "Upload PDF decision reports", type=["pdf"], accept_multiple_files=True
+        )
         all_data = []
-        for file in uploaded_files:
-            text = parse_pdf(file)  # however you get raw text
-            meta = extract_metadata(text)
-            meta['__file_name__'] = file.name
-            all_data.append(meta)
+        if uploaded_files:
+            my_bar = st.progress(0, text="Starting processing...")
+            for idx, uploaded_file in enumerate(uploaded_files, start=1):
+                my_bar.progress(int((idx - 1) / len(uploaded_files) * 50),
+                                text=f"Reading PDF {idx}/{len(uploaded_files)}...")
+                # Read PDF bytes and extract full text
+                pdf_bytes = uploaded_file.read()
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                full_text = "".join(page.get_text() for page in doc)
 
-        # Build DataFrame
+                # Extract metadata, passing filename for fallback
+                meta = extract_metadata(full_text, uploaded_file.name)
+
+                # Store raw filename if needed
+                meta["__file_name__"] = uploaded_file.name
+                all_data.append(meta)
+            my_bar.progress(50, text="Finished reading PDFs.")
+
+        # --- Stage 2: Build DataFrame & Geocode ---
         if all_data:
             df = pd.DataFrame(all_data)
-            # ... rest of DataFrame transformations …
+            # Map Address if you extracted it
+            my_bar.progress(60, text="Preparing addresses for geocoding...")
+            if "Address" in df.columns:
+                df["GeoKey"] = df["Address"].str.lower().str.strip()
+                geolocator = Nominatim(user_agent="consent_app")
+                rate_limiter = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+                df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(
+                    lambda x: geolocator.geocode(x) and (geolocator.geocode(x).latitude,
+                                                         geolocator.geocode(x).longitude)))
+            my_bar.progress(90, text="Geocoding complete.")
 
-        # Now your expander/table will use the updated Consent Number column
-        if 'df' in locals() and not df.empty:
+        # --- Consent Table Render ---
+        if all_data and not df.empty:
             with st.expander("Consent Table", expanded=True):
-                # … same table logic …
-                pass
+                status_filter = st.selectbox(
+                    "Filter by Status",
+                    ["All"] + df.get("Consent Status Enhanced", pd.Series()).unique().tolist(),
+                    key="consent_status_filter"
+                )
+                my_bar.progress(95, text="Filtering and displaying consent table...")
+                filtered_df = df if status_filter == "All" else df[df.get("Consent Status Enhanced") == status_filter]
+                columns = ["Consent Number"] + [c for c in ["Company Name", "Address", "Issue Date", "Expiry Date",
+                                                            "Consent Status Enhanced", "AUP(OP) Triggers",
+                                                            "Reason for Consent"] if c in filtered_df.columns]
+                display_df = filtered_df[columns].rename(columns={"Consent Status Enhanced": "Consent Status"})
+                st.dataframe(display_df)
+                csv_out = display_df.to_csv(index=False).encode("utf-8")
+                st.download_button("Download CSV", csv_out, "filtered_consents.csv", "text/csv")
         else:
-            st.warning("No consent data available. Please upload PDF files or check logs.")
-
+            st.warning("No consent data available. Please upload PDF files.")
         # Consent Map
         with st.expander("Consent Map", expanded=True):
             map_df = df.dropna(subset=["Latitude", "Longitude"])
