@@ -558,7 +558,7 @@ if uploaded_files:
             filtered_df = df.copy() if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
             # 4) Define exactly the columns to show
             columns_to_display = [
-                "Resource Consent Numbers",  # <-- now the file name
+                "Consent Number",  # <-- now the file name
                 "Company Name",
                 "Address",
                 "Issue Date",
