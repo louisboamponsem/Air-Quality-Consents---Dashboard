@@ -456,32 +456,26 @@ df = pd.DataFrame()
 
 # --- File Processing & Dashboard ---
 if uploaded_files:
+    # --- START: MULTI-STAGE PROGRESS BAR ---
     my_bar = st.progress(0, text="Initializing...")
     all_data = []
     total_files = len(uploaded_files)
 
+    # Stage 1: PDF Processing (0% -> 70% of total progress)
     for i, file in enumerate(uploaded_files):
+        # Calculate progress within the 0-70 range
         progress_stage1 = int(((i + 1) / total_files) * 70)
         my_bar.progress(progress_stage1, text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
         try:
-            file.seek(0)
             file_bytes = file.read()
             with fitz.open(stream=file_bytes, filetype="pdf") as doc:
                 text = "\n".join(page.get_text() for page in doc)
-
-            data = extract_metadata(text)  # Only extract from text
-
-            # Use filename as consent number
-            data["Resource Consent Numbers"] = os.path.splitext(file.name)[0]
-
+            data = extract_metadata(text)
             data["__file_name__"] = file.name
             data["__file_bytes__"] = file_bytes
             all_data.append(data)
-
         except Exception as e:
             st.error(f"Error processing {file.name}: {e}")
-
-    df = pd.DataFrame(all_data)
     # --- END Stage 1 ---
 
     if all_data:
