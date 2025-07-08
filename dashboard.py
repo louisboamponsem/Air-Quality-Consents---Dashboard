@@ -185,21 +185,33 @@ def geocode_address(address):
 
 
 def extract_metadata(text):
-    file_bytes = file.read()
-    with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-        text = "\n".join(page.get_text() for page in doc)
-    data = extract_metadata(text)
+    if uploaded_files:
+        my_bar = st.progress(0, text="Initializing...")
+        all_data = []
+        total_files = len(uploaded_files)
 
-    # --- ADD THIS LINE BELOW ---
-    import os
-    consent_number_from_filename = os.path.splitext(file.name)[0]  # Strip off .pdf extension
-    if consent_number_from_filename:
-        data["Resource Consent Numbers"] = consent_number_from_filename
-    # --------------------------------
+        for i, file in enumerate(uploaded_files):
+            progress_stage1 = int(((i + 1) / total_files) * 70)
+            my_bar.progress(progress_stage1, text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
+            try:
+                file.seek(0)  # Make sure file pointer is at the start
+                file_bytes = file.read()
+                with fitz.open(stream=file_bytes, filetype="pdf") as doc:
+                    text = "\n".join(page.get_text() for page in doc)
 
-    data["__file_name__"] = file.name
-    data["__file_bytes__"] = file_bytes
-    all_data.append(data)
+                data = extract_metadata(text)
+
+                import os
+                consent_number_from_filename = os.path.splitext(file.name)[0]
+                if consent_number_from_filename:
+                    data["Resource Consent Numbers"] = consent_number_from_filename
+
+                data["__file_name__"] = file.name
+                data["__file_bytes__"] = file_bytes
+                all_data.append(data)
+            except Exception as e:
+                st.error(f"Error processing {file.name}: {e}")
+
     # RC number patterns
     rc_patterns = [
         r"Application number:\s*(.+?)(?=\s*Applicant:)",
