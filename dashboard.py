@@ -25,6 +25,39 @@ from langchain_groq import ChatGroq  # For Groq (Langchain integration)
 from langchain_core.messages import SystemMessage, HumanMessage  # Needed for Langchain messages
 
 # --- End LLM Specific Imports ---
+# File Upload & Consent Number Extraction
+# ------------------------
+# File Upload & Consent Number Extraction
+# ------------------------
+uploaded_files = st.sidebar.file_uploader(
+    "Upload PDF decision reports", type=["pdf"], accept_multiple_files=True
+)
+consents = []
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        # Extract consent number from file name
+        filename = uploaded_file.name  # e.g., "BUN60381545 Decision.pdf"
+        consent_number = os.path.splitext(filename)[0]  # "BUN60381545 Decision"
+        # Optionally refine: split off descriptive part
+        # consent_number = filename.split()[0]  # "BUN60381545"
+        consents.append(consent_number)
+
+        # Display on UI
+        st.sidebar.markdown(f"**Consent Number:** {consent_number}")
+
+        # Read PDF bytes for parsing below
+        pdf_bytes = uploaded_file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        # ... existing PDF parsing logic ...
+
+# Store or display all extracted consent numbers
+if consents:
+    st.markdown("### Uploaded Consents")
+    for c in consents:
+        st.write(f"- {c}")
+# ... rest of dashboard code unchanged ...
+
 
 # --- API Key Setup ---
 load_dotenv()
@@ -511,14 +544,6 @@ uploaded_files = st.sidebar.file_uploader("Upload PDF files", type=["pdf"], acce
 query_input = st.sidebar.text_input("LLM Semantic Search Query")
 
 
-@st.cache_resource
-def load_embedding_model(name):
-    return SentenceTransformer(name)
-
-
-embedding_model = load_embedding_model(model_name)
-
-
 # --- CACHING EMBEDDINGS FOR PERFORMANCE ---
 @st.cache_data(show_spinner="Generating document embeddings...")
 def get_corpus_embeddings(text_blobs_tuple, model_name_str):
@@ -527,60 +552,109 @@ def get_corpus_embeddings(text_blobs_tuple, model_name_str):
     return model_obj.encode(list(text_blobs_tuple), convert_to_tensor=True)
 
 
-df = pd.DataFrame()
-
+# --- File Processing & Dashboard ---
 # --- File Processing & Dashboard ---
 if uploaded_files:
-    # --- START: MULTI-STAGE PROGRESS BAR ---
+    # 1) Initialize progress bar & collect PDF text
     my_bar = st.progress(0, text="Initializing...")
     all_data = []
-    total_files = len(uploaded_files)
-
-    # Stage 1: PDF Processing (0% -> 70% of total progress)
+    total = len(uploaded_files)
     for i, file in enumerate(uploaded_files):
-        # Calculate progress within the 0-70 range
-        progress_stage1 = int(((i + 1) / total_files) * 70)
-        my_bar.progress(progress_stage1, text=f"Step 1/3: Processing file {i + 1}/{total_files} ({file.name})...")
+        pct = int(((i + 1) / total) * 70)
+        my_bar.progress(pct, text=f"Step 1/3: Processing {file.name} ({i+1}/{total})...")
         try:
-            file_bytes = file.read()
-            with fitz.open(stream=file_bytes, filetype="pdf") as doc:
-                text = "\n".join(page.get_text() for page in doc)
-            data = extract_metadata(text)
-            data["__file_name__"] = file.name
-            data["__file_bytes__"] = file_bytes
-            all_data.append(data)
+            fb = file.read()
+            with fitz.open(stream=fb, filetype="pdf") as doc:
+                txt = "\n".join(page.get_text() for page in doc)
+            rec = extract_metadata(txt)
+            rec["__file_name__"]  = file.name
+            rec["__file_bytes__"] = fb
+            all_data.append(rec)
         except Exception as e:
-            st.error(f"Error processing {file.name}: {e}")
-    # --- END Stage 1 ---
+            st.error(f"Error on {file.name}: {e}")
 
+    # 2) If we got anything, build the DataFrame & go
     if all_data:
-        # --- Stage 2: Geocoding (70% -> 90% of total progress) ---
-        my_bar.progress(75, text="Step 2/3: Geocoding addresses. This may take a moment...")
+        # 2a) Geocoding progress
+        my_bar.progress(75, text="Step 2/3: Geocoding addresses...")
         df = pd.DataFrame(all_data)
-        df["GeoKey"] = df["Address"].str.lower().str.strip()
-        # Geocoding is the slow part of this stage
-        df["Latitude"], df["Longitude"] = zip(*df["GeoKey"].apply(geocode_address))
 
-        # --- Stage 3: Finalizing and Rendering (90% -> 100%) ---
-        my_bar.progress(90, text="Step 3/3: Finalizing data and rendering dashboard...")
+        # ─── Force the consent ID to be the PDF file name ────────────────────────────
+        df["Resource Consent Numbers"] = df["__file_name__"]
 
+        # ─── Drop now-redundant internal columns ────────────────────────────────────
+        df.drop(
+            columns=["__file_name__", "Consent Condition Numbers"],
+            errors="ignore",
+            inplace=True
+        )
+
+        # 2b) Geocode
+        df["GeoKey"] = df["Address"].astype(str).str.lower().str.strip()
+        df["Latitude"], df["Longitude"] = zip(
+            *df["GeoKey"].apply(geocode_address)
+        )
+
+        # 3) Finalizing (dates, status, metrics)
+        my_bar.progress(90, text="Step 3/3: Finalizing dashboard...")
         # --- DATETIME LOCALIZATION ---
-        auckland_tz = pytz.timezone("Pacific/Auckland")
-        df['Issue Date'] = pd.to_datetime(df['Issue Date'], errors='coerce',
-                                          dayfirst=True)  # Ensure Issue Date is datetime
-        df['Issue Date'] = df['Issue Date'].apply(localize_to_auckland)
-        df['Expiry Date'] = pd.to_datetime(df['Expiry Date'], errors='coerce', dayfirst=True)
-        df['Expiry Date'] = df['Expiry Date'].apply(localize_to_auckland)
-
-        # --- ENHANCED STATUS CALCULATION ---
+        df["Issue Date"]  = pd.to_datetime(df["Issue Date"],  errors="coerce", dayfirst=True).apply(localize_to_auckland)
+        df["Expiry Date"] = pd.to_datetime(df["Expiry Date"], errors="coerce", dayfirst=True).apply(localize_to_auckland)
+        # --- ENHANCED STATUS ---
         df["Consent Status Enhanced"] = df["Consent Status"]
-        current_nz_aware_time = datetime.now(pytz.timezone("Pacific/Auckland"))
+        now_nz = datetime.now(pytz.timezone("Pacific/Auckland"))
         df.loc[
-            (df["Consent Status"] == "Active") &
-            (df["Expiry Date"] > current_nz_aware_time) &
-            (df["Expiry Date"] <= current_nz_aware_time + timedelta(days=90)),
+            (df["Consent Status"]=="Active") &
+            (df["Expiry Date"]> now_nz) &
+            (df["Expiry Date"]<= now_nz + timedelta(days=90)),
             "Consent Status Enhanced"
         ] = "Expiring in 90 Days"
+
+        # --- Metrics & Visuals (as you already have them) ---
+        # st.subheader(...); colored_metric(...); status bar chart; etc.
+
+        # --- Consent Table ---
+        with st.expander("Consent Table", expanded=True):
+            status_filter = st.selectbox(
+                "Filter by Status",
+                ["All"] + df["Consent Status Enhanced"].unique().tolist(),
+                key="consent_status_filter"
+            )
+            my_bar.progress(95, text="Step 4/4: Displaying consent table...")
+            filtered = df if status_filter=="All" else df[df["Consent Status Enhanced"]==status_filter]
+            cols = [
+                "Resource Consent Numbers",
+                "Company Name", "Address",
+                "Issue Date", "Expiry Date",
+                "Consent Status Enhanced",
+                "AUP(OP) Triggers"
+            ]
+            if "Reason for Consent" in filtered.columns:
+                cols.append("Reason for Consent")
+            display_df = (
+                filtered[cols]
+                .rename(columns={"Consent Status Enhanced":"Consent Status"})
+            )
+            st.dataframe(display_df)
+            st.download_button(
+                "Download CSV",
+                display_df.to_csv(index=False).encode("utf-8"),
+                "filtered_consents.csv",
+                "text/csv"
+            )
+
+        # --- Consent Map, Semantic Search, etc. (your existing code) ---
+
+        # 4) Done!
+        my_bar.progress(100, text="Dashboard Ready!")
+        time.sleep(1)
+        my_bar.empty()
+
+    else:
+        # Handle no-data case
+        my_bar.empty()
+        st.warning("Could not extract any data from the uploaded files.")
+
 
         # --- START RENDERING DASHBOARD ---
 
@@ -619,24 +693,36 @@ if uploaded_files:
         fig_status.update_layout(title="Consent Status Overview", title_x=0.5)
         st.plotly_chart(fig_status, use_container_width=True)
 
-        # Consent Table
+        # --- Consent Table ---
         with st.expander("Consent Table", expanded=True):
-            status_filter = st.selectbox("Filter by Status", ["All"] + df["Consent Status Enhanced"].unique().tolist())
-            filtered_df = df if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
-
+            # 1) Status filter
+            status_filter = st.selectbox(
+                "Filter by Status",
+                ["All"] + df["Consent Status Enhanced"].unique().tolist(),
+                key="consent_status_filter"
+            )
+            # 2) Progress indicator
+            my_bar.progress(95, text="Step 4/4: Filtering and displaying consent table...")
+            # 3) Apply filter
+            filtered_df = df.copy() if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
+            # 4) Define exactly the columns to show
             columns_to_display = [
-                "__file_name__", "Resource Consent Numbers", "Company Name", "Address", "Issue Date", "Expiry Date",
-                "Consent Status Enhanced", "AUP(OP) Triggers"
+                "Resource Consent Numbers",  # <-- now the file name
+                "Company Name",
+                "Address",
+                "Issue Date",
+                "Expiry Date",
+                "Consent Status Enhanced",
+                "AUP(OP) Triggers",
             ]
-            # Conditionally add "Reason for Consent" and "Consent Condition Numbers" if they exist
             if "Reason for Consent" in filtered_df.columns:
                 columns_to_display.append("Reason for Consent")
-            if "Consent Condition Numbers" in filtered_df.columns:
-                columns_to_display.append("Consent Condition Numbers")
-
-            display_df = filtered_df[columns_to_display].rename(
-                columns={"__file_name__": "File Name", "Consent Status Enhanced": "Consent Status"})
-
+            # 5) Slice & rename
+            display_df = (
+                filtered_df[columns_to_display]
+                .rename(columns={"Consent Status Enhanced": "Consent Status"})
+            )
+            # 6) Render & download
             st.dataframe(display_df)
             csv_output = display_df.to_csv(index=False).encode("utf-8")
             st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
