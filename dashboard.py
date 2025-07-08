@@ -559,6 +559,43 @@ if uploaded_files:
         # Build DataFrame from all_data
         df = pd.DataFrame(all_data)
 
+
+        def extract_consent_number_from_text(text, filename):
+            # 1) grab every DIS###… occurrence
+            matches = re.findall(r"\bDIS\d+\b", text or "")
+            if not matches:
+                # nothing found → fallback to filename (minus .pdf)
+                return os.path.splitext(os.path.basename(filename))[0]
+            if len(matches) == 1:
+                return matches[0]
+            # 2) if multiple, pick the one nearest the word “air”
+            lower = (text or "").lower()
+            air_idx = lower.find("air")
+
+            # find each match’s position
+            def idx_of(m):
+                return (text or "").find(m)
+
+            if air_idx >= 0:
+                # choose the match minimizing |match_pos – air_pos|
+                return min(matches, key=lambda m: abs(idx_of(m) - air_idx))
+            # 3) if “air” isn’t in the text, just take the first
+            return matches[0]
+
+
+        # ——— now inject into your DataFrame ———
+        if 'df' in locals():
+            # assume you stashed each uploaded filename in __file_name__ and each full‐text in text
+            if 'text' in df.columns and '__file_name__' in df.columns:
+                df['Consent Number'] = df.apply(
+                    lambda row: extract_consent_number_from_text(row['text'], row['__file_name__']),
+                    axis=1
+                )
+            else:
+                # no text to scan? fall back entirely to filename
+                df['Consent Number'] = df['__file_name__'].apply(
+                    lambda fn: os.path.splitext(os.path.basename(fn))[0]
+                )
         # ——— Inject Consent Number from the uploaded PDF filename ———
         # (Requires that you saved each file’s name into data['__file_name__'])
         import os  # make sure os is imported at the top of your file
