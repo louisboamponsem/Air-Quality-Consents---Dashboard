@@ -619,36 +619,24 @@ if uploaded_files:
         fig_status.update_layout(title="Consent Status Overview", title_x=0.5)
         st.plotly_chart(fig_status, use_container_width=True)
 
-        # --- Consent Table ---
+        # Consent Table
         with st.expander("Consent Table", expanded=True):
-            # 1) Status filter
-            status_filter = st.selectbox(
-                "Filter by Status",
-                ["All"] + df["Consent Status Enhanced"].unique().tolist(),
-                key="consent_status_filter"
-            )
-            # 2) Progress indicator
-            my_bar.progress(95, text="Step 4/4: Filtering and displaying consent table...")
-            # 3) Apply filter
-            filtered_df = df.copy() if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
-            # 4) Define exactly the columns to show
+            status_filter = st.selectbox("Filter by Status", ["All"] + df["Consent Status Enhanced"].unique().tolist())
+            filtered_df = df if status_filter == "All" else df[df["Consent Status Enhanced"] == status_filter]
+
             columns_to_display = [
-                "Resource Consent Numbers",  # <-- now the file name
-                "Company Name",
-                "Address",
-                "Issue Date",
-                "Expiry Date",
-                "Consent Status Enhanced",
-                "AUP(OP) Triggers",
+                "__file_name__", "Resource Consent Numbers", "Company Name", "Address", "Issue Date", "Expiry Date",
+                "Consent Status Enhanced", "AUP(OP) Triggers"
             ]
+            # Conditionally add "Reason for Consent" and "Consent Condition Numbers" if they exist
             if "Reason for Consent" in filtered_df.columns:
                 columns_to_display.append("Reason for Consent")
-            # 5) Slice & rename
-            display_df = (
-                filtered_df[columns_to_display]
-                .rename(columns={"Consent Status Enhanced": "Consent Status"})
-            )
-            # 6) Render & download
+            if "Consent Condition Numbers" in filtered_df.columns:
+                columns_to_display.append("Consent Condition Numbers")
+
+            display_df = filtered_df[columns_to_display].rename(
+                columns={"__file_name__": "File Name", "Consent Status Enhanced": "Consent Status"})
+
             st.dataframe(display_df)
             csv_output = display_df.to_csv(index=False).encode("utf-8")
             st.download_button("Download CSV", csv_output, "filtered_consents.csv", "text/csv")
