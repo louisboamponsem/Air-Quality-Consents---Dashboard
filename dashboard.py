@@ -370,7 +370,7 @@ def extract_metadata(text):
 
 
     return {
-        "Consent Number": rc_str if rc_str else "Unknown Resource Consent Numbers",
+        "Consent Number": rc_str if rc_str else "Unknown Consent Number",
         "Company Name": company_str if company_str else "Unknown Company Name",
         "Address": address_str if address_str else "Unknown Address",
         "Issue Date": issue_date.strftime("%d-%m-%Y") if issue_date else "Unknown Issue Date",
@@ -686,7 +686,7 @@ with st.expander("AI Chatbot", expanded=True):
 
                     if not df.empty:
                         context_df_for_ai = df[[
-                            "Resource Consent Numbers", "Company Name", "Address", "Issue Date",
+                            "Consent Number", "Company Name", "Address", "Issue Date",
                             "Expiry Date", "AUP(OP) Triggers", "Consent Status Enhanced"  # Using Enhanced Status for AI
                         ]].copy()
 
@@ -703,7 +703,7 @@ with st.expander("AI Chatbot", expanded=True):
                     else:
                         st.info("No documents uploaded. AI is answering with general knowledge or default sample data.")
                         context_sample_list = [
-                            {"Company Name": "Default Sample Ltd", "Resource Consent Numbers": "DIS60327400",
+                            {"Company Name": "Default Sample Ltd", "Consent Number": "DIS60327400",
                              "Address": "123 Default St, Auckland", "Consent Status": "Active",
                              "AUP(OP) Triggers": "E14.1.1 (default)", "Issue Date": "2024-01-01",
                              "Expiry Date": "2025-12-31"}]
