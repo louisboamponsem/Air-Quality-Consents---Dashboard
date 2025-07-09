@@ -34,7 +34,7 @@ openweathermap_api_key = os.getenv("OPENWEATHER_API_KEY") or st.secrets.get("OPE
 # ------------------------
 # Streamlit Page Config & Style (MUST BE THE FIRST STREAMLIT COMMAND)
 # ------------------------
-st.set_page_config(page_title="Auckland Air Discharge Consents Dashboard", layout="wide", page_icon="ðﾟﾇﾳðﾟﾇ﾿", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Auckland Air Discharge Consents Dashboard", layout="wide", page_icon=" ", initial_sidebar_state="expanded")
 
 if google_api_key:
     genai.configure(api_key=google_api_key)
@@ -76,7 +76,7 @@ weather = get_auckland_weather()
 st.markdown(f"""
     <div style='text-align:center; padding:12px; font-size:1.2em; background-color:#656e6b;
                     border-radius:10px; margin-bottom:15px; font-weight:500; color:white;'>
-        ðﾟﾓﾍ <strong>Auckland</strong> &nbsp;&nbsp;&nbsp; ðﾟﾓﾅ <strong>{today}</strong> &nbsp;&nbsp;&nbsp; ⏰ <strong>{current_time}</strong> &nbsp;&nbsp;&nbsp; ðﾟﾌﾦ️ <strong>{weather}</strong>
+         <strong>Auckland</strong> &nbsp;&nbsp;&nbsp;  <strong>{today}</strong> &nbsp;&nbsp;&nbsp; ⏰ <strong>{current_time}</strong> &nbsp;&nbsp;&nbsp;  <strong>{weather}</strong>
     </div>
 """, unsafe_allow_html=True)
 
@@ -535,7 +535,7 @@ if not st.session_state.master_df.empty:
                 st.warning("Please upload and process files to enable semantic search.")
 
 else:
-    st.info("ðﾟﾑﾈ Please upload one or more PDF consent files using the control panel on the left to get started.")
+    st.info(" Please upload one or more PDF consent files using the control panel on the left to get started.")
 
 # ----------------------------
 # Ask AI About Consents Chatbot
@@ -599,7 +599,7 @@ with st.expander("AI Chatbot", expanded=True):
                     """
                     full_prompt_for_human_message = f"{context_sample_json}\n\nUser Query: {chat_input}"
 
-                    st.markdown(f"### ðﾟﾖﾥ️ Answer from {llm_provider}")
+                    st.markdown(f"### Answer from {llm_provider}")
                     answer_placeholder = st.empty()
 
                     if llm_provider == "Gemini AI":
